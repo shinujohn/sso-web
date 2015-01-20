@@ -35,7 +35,9 @@ var config = {
     redirectUrl: 'http://localhost:8787/auth/token' ,
     resource: '00000002-0000-0000-c000-000000000000',
     azureUrl: 'https://login.windows.net/{{tenant}}/oauth2/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&resource={{resource}}',
-    apiBaseUrl: 'http://localhost:8788'
+    azureSignoutUrl: 'https://login.windows.net/{{tenant}}/oauth2/logout?client_id={{clientId}}&post_logout_redirect_uri={{redirectUri}}', 
+    apiBaseUrl: 'http://localhost:8788',
+    apiLogoutUrl: 'http://localhost:8788/auth/logout'
 };
 
 /*
@@ -52,6 +54,11 @@ azureUrl = azureUrl.replace('{{tenant}}', (process.env.tenant || config.tenant))
             .replace('{{redirectUri}}', redirectUri)
             .replace('{{resource}}', resource);
 
+var azureSignoutUrl = (process.env.azureSignoutUrl || config.azureSignoutUrl);
+azureSignoutUrl = azureSignoutUrl.replace('{{tenant}}', (process.env.tenant || config.tenant))
+            .replace('{{clientId}}', (process.env.clientId || config.clientId))
+            .replace('{{redirectUri}}', (process.env.apiLogoutUrl || config.apiLogoutUrl));
+
 /*
  * Login request handler - redirects to the Azure AD signin page 
  */
@@ -63,6 +70,19 @@ server.get('/auth/login', function (req, res) {
         res.redirect(azureUrl + '&state=' + state);
     });
     
+});
+
+/*
+ * logout request handler - redirects to the Azure AD signout page 
+ */
+server.get('/auth/logout', function (req, res) {    
+    req.session.destroy(function (err) {
+        console.error(err);
+    });
+    
+    res.clearCookie('auth');
+    res.clearCookie('state');
+    res.redirect(azureSignoutUrl);
 });
 
 /*
