@@ -2,6 +2,8 @@
 var session = require('express-session');
 var cookieParser = require('cookie-parser');
 var path = require('path');
+var adal = require('adal-node');
+var crypto = require('crypto');
 var proxySecurity = require('./ProxySecurity');
 
 var server = express();
@@ -22,27 +24,63 @@ server.use(session({
 
 /*
  * General configuration
- * loginUrl: application will be redirected to this url if the request is not authenticated
  */
+// app name: aadonesc-web
 var config = {
-    loginUrl: "http://localhost:8788/auth/login"
-
+    tenant: 'aadonesc.onmicrosoft.com',
+    loginUrl: 'https://login.windows.net',
+    clientId: 'a4eb9cad-1631-4a4f-a799-ce29ff568157',
+    clientSecret: 'ikWO5pcpv/LjWCKwg0IIjuPSlsKb55zoizdIvVg7RWc=',
+    port: 8788,
+    redirectUrl: 'http://localhost:8787/auth/token' ,
+    resource: '00000002-0000-0000-c000-000000000000',
+    azureUrl: 'https://login.windows.net/{{tenant}}/oauth2/authorize?response_type=code&client_id={{clientId}}&redirect_uri={{redirectUri}}&resource={{resource}}',
+    apiBaseUrl: 'http://localhost:8788'
 };
+
+/*
+ * Azure AD login
+ */
+var AuthenticationContext = adal.AuthenticationContext;
+var loginUrl = (process.env.loginUrl || config.loginUrl) + '/' + (process.env.tenant || config.tenant);
+var redirectUri = (process.env.redirectUrl || config.redirectUrl);
+var resource = (process.env.resource || config.resource);
+
+var azureUrl = (process.env.azureUrl || config.azureUrl);
+azureUrl = azureUrl.replace('{{tenant}}', (process.env.tenant || config.tenant))
+            .replace('{{clientId}}', (process.env.clientId || config.clientId))
+            .replace('{{redirectUri}}', redirectUri)
+            .replace('{{resource}}', resource);
+
+/*
+ * Login request handler - redirects to the Azure AD signin page 
+ */
+server.get('/auth/login', function (req, res) {
+    crypto.randomBytes(48, function (ex, buf) {
+        var state = buf.toString('base64').replace(/\//g, '_').replace(/\+/g, '-');
+        
+        res.cookie('state', state);
+        res.redirect(azureUrl + '&state=' + state);
+    });
+    
+});
 
 /*
  * Handler to recieve the token from API once successfully authenticated
  */
-server.get('/auth', function (req, res) {
-    var token = req.query.token;
-    if (token) {
-        res.cookie('auth', token);
-        req.user = parseUserDataFromToken(token);
-        session.user = parseUserDataFromToken(token);
-        res.redirect('/');
+server.get('/auth/token', function (req, res) {
+    // TODO:
+    if (req.cookies.state !== req.query.state) {
+        res.send('error: state does not match');
     }
-    else {
-        res.send('error - token not recieved');
-    }
+    
+    proxySecurity.getAccessToken(req.query.code).then(function (accessToken) {
+        res.cookie('auth', accessToken);
+        res.redirect((process.env.apiBaseUrl || config.apiBaseUrl) + '/auth/login'); //to authenticate apigateway
+    }).catch(function (err) {
+        res.send(err);
+    });
+ 
 });
 
 /*
@@ -53,7 +91,7 @@ server.use(function (req, res, next) {
         next();
     }
     else {
-        res.redirect(process.env.loginUrl || config.loginUrl);
+        res.redirect('/auth/login');
     }
 });
 
@@ -69,7 +107,7 @@ server.get('/', function (req, res) {
  */
 server.get('/config', function (req, res) {
     res.send({
-        apiBaseUrl: (process.env.apiBaseUrl || 'http://localhost:8788')
+        apiBaseUrl: (process.env.apiBaseUrl || config.apiBaseUrl)
     });
 });
 
