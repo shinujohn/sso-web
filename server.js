@@ -75,9 +75,11 @@ server.get('/auth/token', function (req, res) {
     }
     
     proxySecurity.getAccessToken(req.query.code).then(function (accessToken) {
+        console.log(accessToken);
         res.cookie('auth', accessToken);
         res.redirect((process.env.apiBaseUrl || config.apiBaseUrl) + '/auth/login'); //to authenticate apigateway
     }).catch(function (err) {
+        console.error(err);
         res.send(err);
     });
  
