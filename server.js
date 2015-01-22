@@ -5,6 +5,8 @@ var path = require('path');
 var adal = require('adal-node');
 var crypto = require('crypto');
 var proxySecurity = require('./ProxySecurity');
+var expressJwt = require('express-jwt');
+var jwt = require('jsonwebtoken');
 
 var server = express();
 
@@ -47,6 +49,7 @@ var AuthenticationContext = adal.AuthenticationContext;
 var loginUrl = (process.env.loginUrl || config.loginUrl) + '/' + (process.env.tenant || config.tenant);
 var redirectUri = (process.env.redirectUrl || config.redirectUrl);
 var resource = (process.env.resource || config.resource);
+var secret = "cantguessme";
 
 var azureUrl = (process.env.azureUrl || config.azureUrl);
 azureUrl = azureUrl.replace('{{tenant}}', (process.env.tenant || config.tenant))
@@ -75,7 +78,7 @@ server.get('/auth/login', function (req, res) {
 /*
  * logout request handler - redirects to the Azure AD signout page 
  */
-server.get('/auth/logout', function (req, res) {    
+server.get('/auth/logout', function (req, res) {
     req.session.destroy(function (err) {
         console.error(err);
     });
@@ -94,10 +97,24 @@ server.get('/auth/token', function (req, res) {
         res.send('error: state does not match');
     }
     
-    proxySecurity.getAccessToken(req.query.code).then(function (accessToken) {
+    res.clearCookie('state');
+    res.cookie('key', req.query.code);
+    res.render('./auth.html', { title: 'Authenticating...' });
+});
+
+/*
+ * Handler to recieve the token from API once successfully authenticated
+ */
+server.get('/auth/osctoken', function (req, res) {
+    
+    proxySecurity.getAccessToken(req.cookies.key).then(function (accessToken) {
         console.log(accessToken);
+        res.clearCookie('key');
+        
+        accessToken = jwt.sign(accessToken, secret, { expiresInMinutes: 60 * 5 });
         res.cookie('auth', accessToken);
-        res.redirect((process.env.apiBaseUrl || config.apiBaseUrl) + '/auth/login'); //to authenticate apigateway
+        res.setHeader("Authorization", "Bearer " + accessToken);
+        res.send(accessToken);
     }).catch(function (err) {
         console.error(err);
         res.send(err);
@@ -109,18 +126,29 @@ server.get('/auth/token', function (req, res) {
  * Middleware to validate user context/authentication status
  */
 server.use(function (req, res, next) {
-    if (req.cookies.auth && proxySecurity.validateToken(req.cookies.auth)) {
-        next();
+    if (req.cookies.auth) {
+        var result = jwt.verify(req.cookies.auth, secret, function (err, currentUser) {
+            if (!err && currentUser != null && currentUser.userId.length > 0) {
+                req.user = currentUser;
+                next();
+            }
+            else {
+                res.redirect('/auth/login');
+            }
+        });
+        
     }
     else {
         res.redirect('/auth/login');
     }
 });
 
+
 /*
  * Root
  */
 server.get('/', function (req, res) {
+    console.log(req.user);
     res.render('./index.html', { title: 'Express' });
 });
 
@@ -138,7 +166,3 @@ server.listen(process.env.port || 8787, function () {
     console.log('Webapp started');
 });
 
-// private utility
-function parseUserDataFromToken(token) {
-    return (new Buffer(token.split('.')[0], 'base64')).toString('ascii');
-}

@@ -10,12 +10,13 @@
                     url: config.apiBaseUrl + '/api/user',
                     cache: false,
                     crossDomain: true,
-                    xhrFields: {
-                        withCredentials: true
+                    beforeSend: function (xhr) {
+                        xhr.setRequestHeader("Authorization", "Bearer " + localStorage.getItem('auth'));
+                        xhr.setRequestHeader("oscauth", localStorage.getItem('auth'));
                     },
                     success: function (data) {
-                        $('#username').text(JSON.parse(data).userId);
-                        $('#userroles').text(JSON.parse(data).roles);
+                        $('#username').text(data.userId);
+                        $('#userroles').text(data.roles);
                     }
                 });
 

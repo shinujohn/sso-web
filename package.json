@@ -1,21 +1,24 @@
 {
-    "name": "osc-api",
-    "version": "0.0.0",
-    "description": "api",
-    "main": "server.js",
-    "author": {
-        "name": "oscdev",
-        "email": ""
-    },
-    "dependencies": {
-        "express": "*",
-        "express-session": "*",
-        "cookie-parser": "*",
-        "adal-node": "*",
-        "q": "*",
-        "crypto": "*",
-        "path": "*",
-        "fs": "*",
-        "ejs": "*"
-    }
+  "name": "osc-api",
+  "version": "0.0.0",
+  "description": "api",
+  "main": "server.js",
+  "author": {
+    "name": "oscdev",
+    "email": ""
+  },
+  "dependencies": {
+    "adal-node": "*",
+    "body-parser": "^1.10.2",
+    "cookie-parser": "*",
+    "crypto": "*",
+    "ejs": "*",
+    "express": "*",
+    "express-jwt": "^1.0.0",
+    "express-session": "*",
+    "fs": "*",
+    "jsonwebtoken": "^3.2.2",
+    "path": "*",
+    "q": "*"
+  }
 }
