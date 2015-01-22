@@ -43,7 +43,6 @@ var ProxySecurity = function () {
             function (err, response) {
                 if (!err) {
                     var claimsToken = getClaimsToken(response.userId);
-                    var signedToken = signJSON(claimsToken);
                     deferred.resolve(claimsToken);
                 }
                 else {
