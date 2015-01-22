@@ -11,8 +11,8 @@
                     cache: false,
                     crossDomain: true,
                     beforeSend: function (xhr) {
+                        // TODO: move to global setup for ajax
                         xhr.setRequestHeader("Authorization", "Bearer " + localStorage.getItem('auth'));
-                        xhr.setRequestHeader("oscauth", localStorage.getItem('auth'));
                     },
                     success: function (data) {
                         $('#username').text(data.userId);
